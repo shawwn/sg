@@ -24,7 +24,9 @@ struct Generator {
     iterator(const Gen* self) : self(const_cast<Gen*>(self)) {}
 
     iterator operator++() {
-      ++(*self);
+      if (self) {
+        ++(*self);
+      }
       return *this;
     }
 
@@ -38,7 +40,8 @@ struct Generator {
       return self != other.self;
     }
 
-    auto operator*() const { return **self; }
+    auto& operator*() { return **self; }
+    const auto& operator*() const { return **self; }
 
   protected:
     Gen* self;
@@ -104,7 +107,7 @@ struct Generator {
       h_.destroy();
   }
 
-  explicit operator bool() {
+  explicit operator bool() const {
     fill();
     // The only way to reliably find out whether or not we finished coroutine,
     // whether or not there is going to be a next value generated (co_yield) in
@@ -121,23 +124,16 @@ struct Generator {
     return *this;
   }
 
-  T operator*() {
+  T& operator*() const {
     assert(h_);
     assert(full_);
     return h_.promise().value_;
   }
 
-  T operator()() {
-    fill();
-    full_ = false; // we are going to move out previously cached result to make
-    // promise empty again
-    return std::move(h_.promise().value_);
-  }
+protected:
+  mutable bool full_ = false;
 
-private:
-  bool full_ = false;
-
-  void fill() {
+  void fill() const {
     if (h_ && !full_) {
       h_();
       if (h_.promise().exception_)

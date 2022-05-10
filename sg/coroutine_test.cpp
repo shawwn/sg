@@ -8,17 +8,23 @@
 #include <vector>
 
 #include "coroutine_magic.hpp"
+#include "util/maybe.hpp"
+#include "util/traits.hpp"
+#include "util/type_name.hpp"
+using namespace std::literals::string_literals;
 
-using namespace sg::cpp;
+template <typename T>
+using bare_v =
+    typename std::remove_cv<typename std::remove_reference<T>::type>::type;
 
-auto seq_value_type_v(auto&& seq) -> Bare<decltype(*std::begin(seq))> {}
+auto seq_value_type_v(auto&& seq) -> bare_v<decltype(*std::begin(seq))> {}
 
 template <template <typename...> typename Container>
 auto container_of_v(auto&& seq) -> Container<decltype(seq_value_type_v(seq))> {}
 
 auto vector_of_v(auto&& seq) -> decltype(container_of_v<std::vector>(seq)) {}
 
-auto maybe_of_v(auto&& seq) -> decltype(container_of_v<maybe>(seq)) {}
+auto maybe_of_v(auto&& seq) -> decltype(container_of_v<sg::maybe>(seq)) {}
 
 template <typename T>
 requires requires(T t) { maybe_of_v<decltype(seq_value_type_v(t))>; }
@@ -54,14 +60,14 @@ requires requires(T t) {
            std::rbegin(t);
            std::rend(t);
          }
-auto reversed(T seq) -> Generator<decltype(seq_value_type_v(seq))> {
+auto reversed(T seq) -> sg::Generator<decltype(seq_value_type_v(seq))> {
   for (auto it = seq.rbegin(); it != seq.rend(); it++) {
     yield(*it);
   }
 }
 
 template <typename T>
-Generator<T> reversed(Generator<T> seq) {
+sg::Generator<T> reversed(sg::Generator<T> seq) {
   using vector_t = decltype(vector_of_v(seq));
   vector_t buffered;
   std::copy(std::begin(seq), std::end(seq), std::back_inserter(buffered));
@@ -74,7 +80,7 @@ auto maybes(auto&& seq) -> std::vector<decltype(maybe_of_v(seq))> {
   return vec;
 }
 
-template <typename T, template <typename...> typename V = maybe>
+template <typename T, template <typename...> typename V = sg::maybe>
 requires requires(T t) {
            std::is_same_v<decltype(seq_value_type_v(t)),
                V<decltype(seq_value_type_v(t))>>;
@@ -111,7 +117,7 @@ auto maybes6(auto seq) {
   }
 }
 
-auto range(auto start, auto stop, auto step) -> Generator<decltype(stop)> {
+auto range(auto start, auto stop, auto step) -> sg::Generator<decltype(stop)> {
   assert(step != 0);
   if (step > 0) {
     for (auto i = start; i < stop; i += step) {
@@ -123,23 +129,23 @@ auto range(auto start, auto stop, auto step) -> Generator<decltype(stop)> {
     }
   }
 }
-auto range(auto stop) -> Generator<decltype(stop)> {
+auto range(auto stop) -> sg::Generator<decltype(stop)> {
   yield_from(range(
       static_cast<decltype(stop)>(0), stop, static_cast<decltype(stop)>(1)));
 }
 
-auto range(auto start, auto stop) -> Generator<decltype(stop)> {
+auto range(auto start, auto stop) -> sg::Generator<decltype(stop)> {
   yield_from(range(start, stop, static_cast<decltype(stop)>(1)));
 }
 
 auto enumerate(auto&& l, int start = 0)
-    -> Generator<decltype(std::make_pair(start, *std::begin(l)))> {
+    -> sg::Generator<decltype(std::make_pair(start, *std::begin(l)))> {
   for (auto v : l)
     yield(std::make_pair(start++, v));
 }
 
 // coro fibonacci_sequence(unsigned n) {
-auto sg::fibonacci_sequence(auto n) -> Generator<decltype(n)> {
+auto sg::fibonacci_sequence(auto n) -> sg::Generator<decltype(n)> {
   if (n == 0)
     halt;
   if (n > 94)
@@ -161,12 +167,12 @@ auto sg::fibonacci_sequence(auto n) -> Generator<decltype(n)> {
   }
 }
 
-////Generator<uint64_t> sg::fibonacci_sequence(unsigned n) {
+////sg::Generator<uint64_t> sg::fibonacci_sequence(unsigned n) {
 // decltype(::fibonacci_sequence(0)) sg::fibonacci_sequence(unsigned n) {
 ////  return std::move(::fibonacci_sequence<uint64_t>(n));
 //}
 
-// auto values(auto&& l) -> Generator<decltype(*std::begin(l))> {
+// auto values(auto&& l) -> sg::Generator<decltype(*std::begin(l))> {
 //   for (auto v : l)
 //     yield(v);
 // }
@@ -192,7 +198,7 @@ auto make(auto l) -> C<decltype(value_type_t(l))> {
   return {};
 }
 auto&& append_(auto&& out, auto&& l) {
-  if constexpr (sg::is_iterable<decltype(l)>)
+  if constexpr (sg::util::is_iterable<decltype(l)>)
     std::copy(std::begin(l), std::end(l), std::back_inserter(out));
   else
     std::back_inserter(out) = l;
@@ -328,7 +334,7 @@ constexpr bool is_list() {
 // void disp(const std::string& x) {
 //   std::cout << x;
 // }
-void disp_type(auto&& x) { std::cout << "#{" << type_name(x) << "}"; }
+void disp_type(auto&& x) { std::cout << "#{" << sg::type_name(x) << "}"; }
 void disp(auto&& x) {
   if constexpr (can_print<decltype(x)>()) {
     std::cout << x;
@@ -383,8 +389,8 @@ void sg::testCoroutine() {
 #if 1
   try {
     auto gen = fibonacci_sequence(10); // max 94 before uint64_t overflows
-    for (int j = 0; gen; j++)
-      std::cout << "fib(" << j << ")=" << gen() << '\n';
+    for (int j = 0; gen; j++, ++gen)
+      std::cout << "fib(" << j << ")=" << *gen << '\n';
   } catch (const std::exception& ex) {
     std::cerr << "Exception: " << ex.what() << '\n';
   } catch (...) {
@@ -459,7 +465,7 @@ void sg::testCoroutine() {
     //    std::cout << std::endl;
     prc("foo", 42, l, std::map<std::string, int>{{"foo", 42}},
         sg::fibonacci_sequence<decltype(3)>, fibonacci_sequence(3),
-        ([=]() -> Generator<float> {
+        ([=]() -> sg::Generator<float> {
           yield(42.9);
           //        for (auto it : fibonacci_sequence(10))
           //          yield(it);
