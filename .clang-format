@@ -1,4 +1,11 @@
 BasedOnStyle: LLVM
-AlwaysBreakTemplateDeclarations: true
+#AlwaysBreakTemplateDeclarations: true
 AlignAfterOpenBracket: DontAlign
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
+DerivePointerAlignment: true
+PointerAlignment: Left
+RequiresClausePosition: OwnLine
+IndentRequires: false
+AlwaysBreakTemplateDeclarations: Yes
+PenaltyReturnTypeOnItsOwnLine: 0
+AlwaysBreakAfterDefinitionReturnType: None

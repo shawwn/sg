@@ -1,4 +1,9 @@
-#define yield co_yield
-#define yield_from(f) for (auto x : f) { co_yield x; }
+#define yield(...) co_yield (__VA_ARGS__)
+#define yield_from(f)                                                          \
+  for (auto&& x : f) {                                                         \
+    co_yield (std::forward<decltype(x)>(x));                                   \
+  }
 #define halt co_return
-#define coro template<typename T> Generator<T>
+#define coro                                                                   \
+  template <typename T>                                                        \
+  sg::Generator<T>
