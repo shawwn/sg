@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/coroutine.hpp"
+#include "coroutine.hpp"
 #include "util/maybe.hpp"
 #include "util/string.hpp"
 #include "util/to_array.hpp"

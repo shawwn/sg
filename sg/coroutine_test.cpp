@@ -7,7 +7,7 @@
 #include <map>
 #include <vector>
 
-#include "util/coroutine_magic.hpp"
+#include "coroutine_magic.hpp"
 
 using namespace sg::cpp;
 
